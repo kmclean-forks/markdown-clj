@@ -80,6 +80,9 @@
 (defn md->html-with-meta [text & params]
   (md-to-html-string* text (into [:parse-meta? true] params)))
 
+(defn md->plaintext [text]
+  )
+
 (defn ^:export mdToHtml
   "Js accessible wrapper"
   [& params]
@@ -89,3 +92,8 @@
   "Js accessible wrapper"
   [& params]
   (apply md->html-with-meta params))
+
+(defn ^:export mdToPlaintext
+  "Js accessible wrapper"
+  (apply md->plaintext %)
+  )

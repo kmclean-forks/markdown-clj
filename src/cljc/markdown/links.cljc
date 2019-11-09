@@ -44,48 +44,51 @@
       [title state]
       [italics em strong bold strikethrough])))
 
+(defn- parse-link [text state img?]
+  (loop [out []
+         tokens (seq text)
+         loop-state state]
+    (if (empty? tokens)
+      [(string/join out) loop-state]
+      (let [[head xs] (split-with (partial not= \[) tokens)
+            ;; Overwriting the loop-state here
+            [xs loop-state] (handle-img-link xs loop-state)
+            [title ys] (split-with (partial not= \]) xs)
+            [dud zs] (split-with (partial not= \() ys)
+            [link tail] (split-with (partial not= \)) zs)]
+
+        (cond
+          ;; Skip invalid tags and continue
+          (or (< (count tail) 1) ;; nothing after closing parens, i.e. no link/image found
+              (< (count link) 2) ;; empty link contents, e.g. [missing link]()
+              (> (count dud) 1)) ;; content between ] and ( means not a link/image
+          (recur (concat out head title) (concat dud link tail) loop-state)
+
+          ;; Process Link if needed
+          (and (not img?) (not= (last head) \!))
+          (let [[link-text new-loop-state] (href
+                                             (rest (process-link-title title state))
+                                             (rest link) loop-state)]
+            (recur (concat out head link-text) (rest tail) new-loop-state))
+
+          ;; Process Image if needed
+          (and img? (= (last head) \!))
+          (let [alt (rest title)
+                [url title] (split-with (partial not= \space) (rest link))
+                title (process-link-title (string/join (rest title)) loop-state)
+                ;; Now process / generate the img data
+                [img-text new-loop-state] (img alt url loop-state title)]
+            (recur (concat out (butlast head) img-text) (rest tail) new-loop-state))
+
+          ;; Otherwise skip link and continue
+          :else (recur (concat out head title dud link) tail loop-state))))))
+
 (defn make-link
   [img?]
   (fn link [text {:keys [code codeblock] :as state}]
     (if (or code codeblock)
       [text state]
-      (loop [out []
-             tokens (seq text)
-             loop-state state]
-        (if (empty? tokens)
-          [(string/join out) loop-state]
-          (let [[head xs] (split-with (partial not= \[) tokens)
-                ;; Overwriting the loop-state here
-                [xs loop-state] (handle-img-link xs loop-state)
-                [title ys] (split-with (partial not= \]) xs)
-                [dud zs] (split-with (partial not= \() ys)
-                [link tail] (split-with (partial not= \)) zs)]
-
-            (cond
-              ;; Skip invalid tags and continue
-              (or (< (count tail) 1) ;; nothing after closing parens, i.e. no link/image found
-                  (< (count link) 2) ;; empty link contents, e.g. [missing link]()
-                  (> (count dud) 1)) ;; content between ] and ( means not a link/image
-              (recur (concat out head title) (concat dud link tail) loop-state)
-              
-              ;; Process Link if needed
-              (and (not img?) (not= (last head) \!))
-              (let [[link-text new-loop-state] (href
-                                                (rest (process-link-title title state))
-                                                (rest link) loop-state)]
-                (recur (concat out head link-text) (rest tail) new-loop-state))
-              
-              ;; Process Image if needed
-              (and img? (= (last head) \!))
-              (let [alt (rest title)
-                    [url title] (split-with (partial not= \space) (rest link))
-                    title (process-link-title (string/join (rest title)) loop-state)
-                    ;; Now process / generate the img data
-                    [img-text new-loop-state] (img alt url loop-state title)]
-                (recur (concat out (butlast head) img-text) (rest tail) new-loop-state))
-              
-              ;; Otherwise skip link and continue
-              :else (recur (concat out head title dud link) tail loop-state))))))))
+      (parse-link text state img?))))
 
 (def link (make-link false))
 (def image (make-link true))

@@ -28,7 +28,9 @@
               escape-inhibit-separator
               inhibit
               make-heading
-              dashes]]
+              dashes
+              hr?
+              br-text]]
             #?(:clj [clj-yaml.core :as yaml])))
 
 (declare ^:dynamic *formatter*)
@@ -83,10 +85,9 @@
       [heading (assoc state :inline-heading true)]
       [text state])))
 
-(defn br [text {:keys [code lists] :as state}]
-  [(if (and (= [\space \space] (take-last 2 text))
-            (not (or code lists)))
-     (str (apply str (drop-last 2 text)) "<br />")
+(defn br [text state]
+  [(if-let [parsed (br-text text state)]
+     (str parsed "<br />")
      text)
    state])
 
@@ -227,11 +228,7 @@
 (defn hr [text state]
   (if (:code state)
     [text state]
-    (if (and
-          (or (empty? (drop-while #{\* \space} text))
-              (empty? (drop-while #{\- \space} text))
-              (empty? (drop-while #{\_ \space} text)))
-          (> (count (remove #{\space} text)) 2))
+    (if (hr? text)
       [(str "<hr/>") (assoc state :hr true)]
       [text state])))
 

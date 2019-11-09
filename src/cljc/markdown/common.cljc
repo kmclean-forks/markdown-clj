@@ -91,45 +91,50 @@
    - find all the chunks of the string delimited by the `separator',
    - wrap the output with the `open' and `close' markers, and
    - apply the `transformer' to the text inside the chunk."
+  ([separator]
+   (make-separator separator "" "" identity))
   ([separator open close]
    (make-separator separator open close identity))
   ([separator open close transformer]
    (let [separator (seq separator)]  ;; allow char seq or string
-     (fn [text state]
-       (if (:code state)
-         [text state]
-         (loop [out       []
-                buf       []
-                tokens    (partition-by (partial = (first separator)) (seq text))
-                cur-state (assoc state :found-token false :in-tag? false)]
-           (cond
-             (empty? tokens)
-             [(string/join (into (if (:found-token cur-state) (into out separator) out) buf))
-              (dissoc cur-state :found-token)]
+     (fn apply-separator
+       ([text]
+        (first (apply-separator text {})))
+       ([text state]
+        (if (:code state)
+          [text state]
+          (loop [out       []
+                 buf       []
+                 tokens    (partition-by (partial = (first separator)) (seq text))
+                 cur-state (assoc state :found-token false :in-tag? false)]
+            (cond
+              (empty? tokens)
+              [(string/join (into (if (:found-token cur-state) (into out separator) out) buf))
+               (dissoc cur-state :found-token)]
 
-             (:found-token cur-state)
-             (if (= (first tokens) separator)
-               (let [[new-buf new-state]
-                     (if (identical? transformer identity)
-                       ;; Skip the buf->string->buf conversions in the common
-                       ;; case.
-                       [buf cur-state]
-                       (let [[s new-state] (transformer (string/join buf) cur-state)]
-                         [(seq s) new-state]))]
-                 (recur (vec (concat out (seq open) new-buf (seq close)))
-                        []
-                        (rest tokens)
-                        (assoc new-state :found-token false)))
-               (recur out
-                      (into buf (first tokens))
-                      (rest tokens)
-                      cur-state))
+              (:found-token cur-state)
+              (if (= (first tokens) separator)
+                (let [[new-buf new-state]
+                      (if (identical? transformer identity)
+                        ;; Skip the buf->string->buf conversions in the common
+                        ;; case.
+                        [buf cur-state]
+                        (let [[s new-state] (transformer (string/join buf) cur-state)]
+                          [(seq s) new-state]))]
+                  (recur (vec (concat out (seq open) new-buf (seq close)))
+                         []
+                         (rest tokens)
+                         (assoc new-state :found-token false)))
+                (recur out
+                       (into buf (first tokens))
+                       (rest tokens)
+                       cur-state))
 
-             (and (= (first tokens) separator) (not (:in-tag? cur-state)))
-             (recur out buf (rest tokens) (assoc cur-state :found-token true))
+              (and (= (first tokens) separator) (not (:in-tag? cur-state)))
+              (recur out buf (rest tokens) (assoc cur-state :found-token true))
 
-             :default
-             (recur (into out (first tokens)) buf (rest tokens) (assoc cur-state :in-tag? (open-html-tags (:in-tag? cur-state) (first tokens)))))))))))
+              :default
+              (recur (into out (first tokens)) buf (rest tokens) (assoc cur-state :in-tag? (open-html-tags (:in-tag? cur-state) (first tokens))))))))))))
 
 (defn escape-code-transformer [text state]
   [(escape-code text) state])
@@ -196,3 +201,19 @@
                                     (string/replace #"&mdash;" "---")
                                     (string/replace #"&ndash;" "--"))))))
    state])
+
+(defn hr? [text]
+  (and
+    (or (empty? (drop-while #{\* \space} text))
+        (empty? (drop-while #{\- \space} text))
+        (empty? (drop-while #{\_ \space} text)))
+    (> (count (remove #{\space} text)) 2)))
+
+(defn- br? [text]
+  (= [\space \space] (take-last 2 text)))
+
+(defn br-text
+  ([text]
+   (when (br? text) (apply str (drop-last 2 text))))
+  ([text {:keys [code lists]}]
+   (when (not (or code lists)) (br-text text))))

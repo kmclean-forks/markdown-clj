@@ -6,7 +6,8 @@
             [markdown.links
              :refer [parse-reference parse-reference-link parse-footnote-link]]
             [markdown.transformers
-             :refer [transformer-vector footer parse-metadata-headers]])
+             :refer [transformer-vector footer parse-metadata-headers]]
+            [markdown.plaintext.transformers :refer [plaintext-transformers]])
   (:import [java.io BufferedReader
                     BufferedWriter
                     StringReader
@@ -70,7 +71,7 @@
   output stream. If metadata was requested to be parsed it is returned, otherwise
   nil is returned."
   [in out & params]
-  (binding [markdown.common/*substring* (fn [^String s n] (.substring s n))
+  (binding [markdown.common/*substring*       (fn [^String s n] (.substring s n))
             markdown.transformers/*formatter* clojure.core/format]
     (let [params     (parse-params params)
           references (when (:reference-links? params) (parse-references in))
@@ -120,3 +121,51 @@
 
 (defn md-to-html-string-with-meta [text & params]
   (md-to-html-string* text (into [:parse-meta? true] params)))
+
+(defn- write-formatted-line! [md-formatted-line next-line writer]
+  (let [formatted-text (reduce
+                         (fn [text transformer] (transformer text))
+                         md-formatted-line
+                         plaintext-transformers)]
+    (write writer formatted-text)
+    (when next-line (write writer "\n"))))
+
+(defn md-to-plaintext [input-text]
+  "Reads markdown content from the given text and returns plaintext with
+  markdown annotations removed.
+
+  List formatting is not stripped. I.e. the following text will pass through
+  unchanged:
+  - list
+  * item
+  + another
+  1. list
+  2 item"
+  (let [input  (new StringReader input-text)
+        output (new StringWriter)]
+    (with-open [^BufferedReader reader (io/reader input)
+                ^BufferedWriter writer (io/writer output)]
+      (loop [^String current-line (.readLine reader)
+             ^String next-line (.readLine reader)]
+        (when current-line
+          (write-formatted-line! current-line next-line output)
+          (recur next-line (.readLine reader))))
+      (.flush writer))
+    (.toString output)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
