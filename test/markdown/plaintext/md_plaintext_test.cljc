@@ -44,7 +44,9 @@
          (is (= "foo" (entry-function "*foo*"))))
 
 (deftest italics
-         (is (= "foo" (entry-function "_foo_"))))
+         (is (= "foo" (entry-function "_foo_")))
+         (is (= "inlineitalicsgetstripped"
+                (entry-function "inline_italics_getstripped"))))
 
 (deftest strong
          (is (= "foo" (entry-function "**foo**"))))
@@ -206,26 +208,41 @@
 (deftest superscriptL
          (is (= "foo bar baz" (entry-function "foo^bar baz"))))
 
-(deftest link
-         (is (= "<p><a href='http://underscores_are_fine.com'>underscores<i>are</i>fine</a></p>"
-                (entry-function "<a href='http://underscores_are_fine.com'>underscores_are_fine</a>")))
-         (is (= "<p><a href='http://github.com'>github</a></p>"
+(deftest md-link
+         (is (= "github"
                 (entry-function "[github](http://github.com)")))
-         (is (= "<p><a href='http://github.com/~'>github</a></p>"
+         (is (= "github"
                 (entry-function "[github](http://github.com/~)")))
-         (is (= "<p><a href='http://github.com/^'>github</a></p>"
+         (is (= "github"
                 (entry-function "[github](http://github.com/^)")))
-         (is (= "<p><a href='http://github.com/*'>github</a></p>"
+         (is (= "github"
                 (entry-function "[github](http://github.com/*)")))
-         (is (= "<ul><li><a href='http://github.com/*'>github</a></li></ul>"
-                (entry-function "* [github](http://github.com/*)")))
-         (is (= "<ul><li>hi</li></ul><p><a href='https://see-here'>a link</a></p>"
+         (is (= "* github"
+                (entry-function "* [github](http://github.com/*asdf)")))
+         (is (= "* hi\n\na link"
                 (entry-function "* hi\n\n[a link](https://see-here)")))
-         (is (= "<p><a href='https://clojure.github.io/core.async/#clojure.core.async/>!'>>!</a></p>"
+         (is (= ">!"
                 (entry-function "[>!](https://clojure.github.io/core.async/#clojure.core.async/>!)")))
-         (is (= "<p><a href='https://clojure.github.io/core.async/#clojure.core.async/<!'><!</a></p>"
-                (entry-function "[<!](https://clojure.github.io/core.async/#clojure.core.async/<!)"))))
-;; HERE DOWN
+         (is (= "<!"
+                (entry-function "[<!](https://clojure.github.io/core.async/#clojure.core.async/<!)")))
+         (is (= "one link two links"
+                (entry-function "[one link](http://example.com) [two links](http://example.com)")))
+         (is (= "some text with a link in the middle of it"
+                (entry-function "some text with a [link in the middle](http://example.com) of it")))
+         (is (= "just [some] brackets"
+                (entry-function "just [some] brackets")))
+         (is (= "no url given"
+                (entry-function "no [url]() given")))
+         (is (= "un closed [link](text"
+                (entry-function "un closed [link](text"))))
+
+(deftest html-link
+         (is (= "link in the middle"
+                (entry-function "link <a href='http://example.com'>in the</a> middle")))
+         (is (= "link at the end"
+                (entry-function "link at the <a href='http://example.com'>end</a>")))
+         (is (= "link at the beginning"
+                (entry-function "<a href='http://example.com'>link</a> at the beginning"))))
 
 (deftest styled-link
          (is (= "<p><a href='http://github.com'><em>github</em></a></p>"

@@ -44,7 +44,7 @@
       [title state]
       [italics em strong bold strikethrough])))
 
-(defn- parse-link [text state img?]
+(defn parse-link [text state img?]
   (loop [out []
          tokens (seq text)
          loop-state state]
